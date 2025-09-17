@@ -32,7 +32,7 @@ df_inv = pd.DataFrame(np.linalg.inv(df.values),
 estimate_beta = df_inv @ matrix_x.T @ matrix_y
 
 matrix_y['hat_y'] = matrix_x @ estimate_beta
-matrix_y['hat_residuals'] = matrix_y['hat_y'] - matrix_y['y']
+matrix_y['hat_residuals'] = matrix_y['y'] - matrix_y['hat_y']
 
 # obtain the Durbin-Watson test statistic
 numerator = 0.0
@@ -44,12 +44,14 @@ for i in range(1,len(matrix_y)):
     
 hat_d = numerator/denominator
 
+print(f'The true d is {hat_d}.')
+
 # perform a Monte Carlo simulation
-numberOfSimulations = 9999
+numberOfSimulations_b = 9999
 numberOfSamples = len(matrix_y)
 mc_d = []
 
-for i in range(1, numberOfSimulations):
+for i in range(1, numberOfSimulations_b):
     new_res = np.random.normal(loc=0, scale=1, size=numberOfSamples)
     
     this_numerator = 0.0
@@ -83,9 +85,95 @@ for d in mc_d:
         left_counter += 1
      
 # obtain the Monte Carlo p-values for a two-tailed equal-tailed test   
-mc_p = round(2 * min(left_counter / numberOfSimulations, right_counter / numberOfSimulations), 3)
+mc_p = round(2 * min(left_counter / numberOfSimulations_b, right_counter / numberOfSimulations_b), 3)
         
 print(f'The Monte-Carlo p-value is {mc_p}.')
+
+# invert the Durbin-Watson test with approximated rejection region
+approx_corr_upper = round(1 - (c_1 / 2),3)
+approx_corr_lower = round(1 - (c_2 / 2),3)
+
+print(f'The confidence interval for ρ [-1,{approx_corr_lower}] and [{approx_corr_upper},1].')
+
+hat_residuals = matrix_y['hat_residuals']
+hat_variance_residuals = np.var(hat_residuals)
+
+numberOfSimulations_m = 10000
+null_correlation = 0
+mc_d = []
+
+for i in range(1,numberOfSimulations_m):
+    new_error = np.random.normal(loc=0, scale=hat_variance_residuals, size=numberOfSamples+1)
+    
+    new_res = []
+    for j in range(1, numberOfSamples+1):
+        new_res.append(null_correlation * new_error[j-1] + new_error[j])
+        
+    # print(len(new_error))
+    # print(len(new_res))
+    
+    new_hat_res = list(matrix_y['y'] - (matrix_y['hat_y'] + new_res))
+    
+    # print(type(new_hat_res))
+    
+    this_numerator = 0.0
+    this_denominator = 0.0
+    
+    for k in range(1,len(new_hat_res)):
+        this_numerator += (new_hat_res[k] - new_hat_res[k-1]) ** 2
+        this_denominator += new_hat_res[k-1] ** 2
+    
+    this_d = this_numerator / this_denominator
+    mc_d.append(this_d)
+    
+# obtain the approximated rejection region using Monte Carlo approximations c_1^* and c_2^*
+alpha = 0.1
+c_1_quantile = alpha/2
+c_2_quantile = 1 - alpha/2
+c_1 = round(np.quantile(mc_d, c_1_quantile),3)
+c_2 = round(np.quantile(mc_d, c_2_quantile),3)
+
+print(f'The {c_1_quantile}-quantile (c_1) is {c_1}.')
+print(f'The {c_2_quantile}-quantile (c_2) is {c_2}.')
+
+# invert the Durbin-Watson test with approximated rejection region
+approx_corr_upper = round(1 - (c_1 / 2),3)
+approx_corr_lower = round(1 - (c_2 / 2),3)
+
+print(f'The confidence interval for ρ [-1,{approx_corr_lower}] and [{approx_corr_upper},1].')
+
+null_correlation = 0.4
+hat_variance_residuals = np.var(hat_residuals) * (1 - null_correlation)
+mc_d = []
+
+for i in range(1,numberOfSimulations_m):
+    new_error = np.random.normal(loc=0, scale=hat_variance_residuals, size=numberOfSamples+1)
+    
+    new_res = []
+    for j in range(1, numberOfSamples+1):
+        new_res.append(null_correlation * new_error[j-1] + new_error[j])
+    
+    new_hat_res = list(matrix_y['y'] - (matrix_y['hat_y'] + new_res))
+    
+    this_numerator = 0.0
+    this_denominator = 0.0
+    
+    for k in range(1,len(new_hat_res)):
+        this_numerator += (new_hat_res[k] - new_hat_res[k-1]) ** 2
+        this_denominator += new_hat_res[k-1] ** 2
+    
+    this_d = this_numerator / this_denominator
+    mc_d.append(this_d)
+    
+# obtain the approximated rejection region using Monte Carlo approximations c_1^* and c_2^*
+alpha = 0.1
+c_1_quantile = alpha/2
+c_2_quantile = 1 - alpha/2
+c_1 = round(np.quantile(mc_d, c_1_quantile),3)
+c_2 = round(np.quantile(mc_d, c_2_quantile),3)
+
+print(f'The {c_1_quantile}-quantile (c_1) is {c_1}.')
+print(f'The {c_2_quantile}-quantile (c_2) is {c_2}.')  
 
 # invert the Durbin-Watson test with approximated rejection region
 approx_corr_upper = round(1 - (c_1 / 2),3)
