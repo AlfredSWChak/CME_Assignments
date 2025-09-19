@@ -117,24 +117,11 @@ print(f'The Monte-Carlo p-value is {monteCarlo_p}.')
 # Exercise 2b
 
 # invert the Durbin-Watson test with approximated rejection region
-def getCIcorr(input_c_1, input_c_2, d):
-    correlation_list = np.arange(-0.9,0.91,0.01)
-    nonRejectRegion_corr = []
-
-    for corr in correlation_list:
-        # compute the general value of d_0 for corresponding correlation
-        d_0 = 2 * (1 - corr)
-        
-        # compute the new test statistic
-        t_n = d - (d_0 - 2)
-        
-        if input_c_1 <= t_n <= input_c_2:
-            nonRejectRegion_corr.append(corr)
+def getCIcorr(input_c_1, input_c_2, d):    
+    lower_corr = round((input_c_1 - d)/2, 3)
+    upper_corr = round((input_c_2 - d)/2, 3)
     
-    min_corr = round(np.min(nonRejectRegion_corr), 3)
-    max_corr = round(np.max(nonRejectRegion_corr), 3)
-    
-    return min_corr, max_corr
+    return lower_corr, upper_corr
 
 c_1_corr, c_2_corr = getCIcorr(c_1_star, c_2_star, true_d)
 
