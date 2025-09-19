@@ -12,6 +12,7 @@ difference_df = raw_data.diff()
 raw_data.iloc[:, 1:]= difference_df.iloc[:, 1:] # replace the columns by the differences
 
 # Exercise 2a
+print('Exercise 2a:')
 
 # construct matrix X
 matrix_x = raw_data.copy()[['Cow milk production in 1000 t','Population in 1000']]
@@ -115,6 +116,7 @@ monteCarlo_p = getPValue(monteCarlo_d_list, true_d, numberOfSimulations_b)
 print(f'The Monte-Carlo p-value is {monteCarlo_p}.')
 
 # Exercise 2b
+print('Exercise 2b:')
 
 # invert the Durbin-Watson test with approximated rejection region
 def getCIcorr(input_c_1, input_c_2, d):    
@@ -130,6 +132,7 @@ print(f'The (1-α) confidence interval for ρ is [{c_1_corr},{c_2_corr}].')
 hat_residuals = matrix_y['hat_residuals']
 
 # Exercise 3a
+print('Exercise 3a:')
 
 # perform a Monte Carlo simulation
 numberOfSimulations_m = 10000
@@ -167,6 +170,7 @@ coveragePercentage = round(coverageCounter/numberOfSimulations_m * 100, 3)
 print(f'For true ρ = {null_correlation}, the coverage of the confidence interval is {coveragePercentage}%.')
 
 # Exercise 3b
+print('Exercise 3b:')
 
 null_correlation = 0.4
 hat_variance_residuals = np.var(hat_residuals) * (1 - null_correlation ** 2) # error variance
