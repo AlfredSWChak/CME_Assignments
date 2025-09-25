@@ -70,6 +70,8 @@ numberOfSimulations_b = 9999
 numberOfSamples = len(matrix_y)
 monteCarlo_d_list = []
 
+np.random.seed(66) # set seeds to be reproducible
+
 for i in range(1, numberOfSimulations_b):
     new_res = np.random.normal(loc=0, scale=1, size=numberOfSamples)
     
@@ -141,6 +143,8 @@ hat_variance_residuals = np.var(hat_residuals) # error variance
 monteCarlo_d_list = []
 coverageCounter = 0   
 
+np.random.seed(44) # set seeds to be reproducible
+
 for i in range(1,numberOfSimulations_m):
     # generate new error terms
     new_error = np.random.normal(loc=0, scale=hat_variance_residuals, size=numberOfSamples+1)
@@ -177,6 +181,8 @@ hat_variance_residuals = np.var(hat_residuals) * (1 - null_correlation ** 2) # e
 monteCarlo_d_list = []
 coverageCounter = 0
 powerCounter = 0
+
+np.random.seed(88) # set seeds to be reproducible
 
 for i in range(1,numberOfSimulations_m): 
     # generate new error terms   
