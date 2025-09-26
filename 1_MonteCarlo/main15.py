@@ -154,6 +154,7 @@ numberOfSimulations_m = 10000
 null_correlation = 0
 hat_residuals = matrix_y['hat_residuals']
 hat_variance_residuals = np.var(hat_residuals) # error variance
+stdev = np.sqrt(hat_variance_residuals) # error standard deviation
 monteCarlo_d_list = []
 coverageCounter = 0   
 
@@ -162,7 +163,7 @@ np.random.seed(44) # set seeds to be reproducible
 # perform a Monte Carlo simulation
 for i in range(1,numberOfSimulations_m+1):
     # generate new error terms
-    new_error = np.random.normal(loc=0, scale=hat_variance_residuals, size=numberOfSamples+1)
+    new_error = np.random.normal(loc=0, scale=stdev, size=numberOfSamples+1)
     new_res = []
     
     # compute the corresponding residuals
@@ -200,6 +201,7 @@ print('Exercise 3b:')
 # set up for Monte Carlo simulation
 null_correlation = 0.4
 hat_variance_residuals = np.var(hat_residuals) * (1 - null_correlation ** 2) # error variance
+stdev = np.sqrt(hat_variance_residuals) # error standard deviation
 monteCarlo_d_list = []
 coverageCounter = 0
 powerCounter = 0
@@ -209,7 +211,7 @@ np.random.seed(88) # set seeds to be reproducible
 # perform a Monte Carlo simulation
 for i in range(1,numberOfSimulations_m+1): 
     # generate new error terms   
-    new_error = np.random.normal(loc=0, scale=hat_variance_residuals, size=numberOfSamples+1)
+    new_error = np.random.normal(loc=0, scale=stdev, size=numberOfSamples+1)
     new_res = []
     
     # compute the corresponding residuals
