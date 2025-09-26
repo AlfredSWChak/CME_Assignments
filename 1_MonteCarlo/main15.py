@@ -77,7 +77,7 @@ monteCarlo_d_list = []
 np.random.seed(66) # set seeds to be reproducible
 
 # perform a Monte Carlo simulation
-for i in range(1, numberOfSimulations_b):
+for i in range(1, numberOfSimulations_b+1):
     # simulate random residuals
     new_res = np.random.normal(loc=0, scale=1, size=numberOfSamples)
     
@@ -160,7 +160,7 @@ coverageCounter = 0
 np.random.seed(44) # set seeds to be reproducible
 
 # perform a Monte Carlo simulation
-for i in range(1,numberOfSimulations_m):
+for i in range(1,numberOfSimulations_m+1):
     # generate new error terms
     new_error = np.random.normal(loc=0, scale=hat_variance_residuals, size=numberOfSamples+1)
     new_res = []
@@ -207,7 +207,7 @@ powerCounter = 0
 np.random.seed(88) # set seeds to be reproducible
 
 # perform a Monte Carlo simulation
-for i in range(1,numberOfSimulations_m): 
+for i in range(1,numberOfSimulations_m+1): 
     # generate new error terms   
     new_error = np.random.normal(loc=0, scale=hat_variance_residuals, size=numberOfSamples+1)
     new_res = []
