@@ -91,7 +91,7 @@ def t_test(input_alpha, input_t):
 Exercise 1a
 '''
 
-print('Exercise 1a: basic t-test')
+print('Exercise 1a: t-test based on real data')
 
 time_list = np.linspace(1, len(annualAverage), len(annualAverage))
 
@@ -114,11 +114,11 @@ t_statistic_beta_1 = estimate_beta.iat[1,0] / SE_beta_1
 alpha = 0.05
 
 # perform a t-test using the annual averages for β_0
-print(f't-test for β_0 = {round(t_statistic_beta_0,3)}:')
-t_test(alpha, t_statistic_beta_0)
+# print(f't-test for β_0 = {round(t_statistic_beta_0,3)}:')
+# t_test(alpha, t_statistic_beta_0)
 
 # perform a t-test using the annual averages for β_1
-print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:')
+print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:', end = ' ')
 t_test(alpha, t_statistic_beta_1)
 
 print('')
@@ -126,7 +126,7 @@ print('')
 '''
 Exercise 1b: perform the t-test using the different bootstrap methods
 '''
-print('Exercise 1b: t-test')
+print('Exercise 1b: t-test using different bootstrap methods')
 
 numberOfSimulations = 9999
 
@@ -145,6 +145,7 @@ def computeBootstrapPValue(input_t_list, observed_t):
 # Nonparametric residual bootstrap
 
 def perform_iidBootstrap(input_numberOfSimulation, input_y, input_matrixX, input_beta):
+    bootstrap_beta1_list = []
     bootstrap_t_list = []
     
     # obtain residuals under the null
@@ -166,6 +167,7 @@ def perform_iidBootstrap(input_numberOfSimulation, input_y, input_matrixX, input
 
         # extract the estimate beta 1
         bootstrap_beta_1 = estimate_beta.iloc[1,0]
+        bootstrap_beta1_list.append(bootstrap_beta_1)
 
         # compute the standard error of beta 1
         bootstrap_estimate_SE = getHACStandardError(matrix_X, new_y)
@@ -175,10 +177,10 @@ def perform_iidBootstrap(input_numberOfSimulation, input_y, input_matrixX, input
         bootstrap_t_statistic_beta_1 = bootstrap_beta_1 / bootstrap_SE_beta_1
         bootstrap_t_list.append(bootstrap_t_statistic_beta_1)
     
-    return bootstrap_t_list
+    return bootstrap_beta1_list, bootstrap_t_list
 
 # obtain the sequence of simulated test statistic 
-bootstrap_t_list_iid_annual = perform_iidBootstrap(numberOfSimulations, annualAverage, matrix_X, estimate_beta)
+bootstrap_beta1_list_iid_annual, bootstrap_t_list_iid_annual = perform_iidBootstrap(numberOfSimulations, annualAverage, matrix_X, estimate_beta)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_iid_annual, t_statistic_beta_1)
 # report the bootstrap p-value
@@ -187,6 +189,7 @@ print(f'i.i.d. bootstrap: The bootstrap p-value is {bootstrap_p}.')
 # Wild bootstrap
 
 def perform_wildBootstrap(input_numberOfSimulation, input_y, input_matrixX, input_beta):
+    bootstrap_beta1_list = []
     bootstrap_t_list = []
     
     # obtain residuals under the null
@@ -207,6 +210,7 @@ def perform_wildBootstrap(input_numberOfSimulation, input_y, input_matrixX, inpu
 
         # extract the estimate beta 1
         bootstrap_beta_1 = estimate_beta.iloc[1,0]
+        bootstrap_beta1_list.append(bootstrap_beta_1)
 
         # compute the standard error of beta 1
         bootstrap_estimate_SE = getHACStandardError(matrix_X, new_y)
@@ -216,10 +220,10 @@ def perform_wildBootstrap(input_numberOfSimulation, input_y, input_matrixX, inpu
         bootstrap_t_statistic_beta_1 = bootstrap_beta_1 / bootstrap_SE_beta_1
         bootstrap_t_list.append(bootstrap_t_statistic_beta_1)
     
-    return bootstrap_t_list
+    return bootstrap_beta1_list, bootstrap_t_list
 
 # obtain the sequence of simulated test statistic 
-bootstrap_t_list_wild_annual = perform_wildBootstrap(numberOfSimulations, annualAverage, matrix_X, estimate_beta)
+bootstrap_beta1_list_wild_annual, bootstrap_t_list_wild_annual = perform_wildBootstrap(numberOfSimulations, annualAverage, matrix_X, estimate_beta)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_wild_annual, t_statistic_beta_1)
 # report the bootstrap p-value
@@ -238,6 +242,8 @@ print('Exercise 2a: Winter Average')
 
 matrix_X, estimate_beta, hat_y, hat_residuals = runRegressionModel(winterAverage, time_list)
 
+print(f'Winter: β_0 = {round(estimate_beta.iat[0,0],3)} & β_1 = {round(estimate_beta.iat[1,0],3)}')
+
 # compute the HAC standard errors
 estimate_SE = getHACStandardError(matrix_X, winterAverage)
 
@@ -253,17 +259,17 @@ t_statistic_beta_1 = estimate_beta.iat[1,0] / SE_beta_1
 alpha = 0.05
 
 # perform a t-test using the annual averages for β_0
-print(f't-test for β_0 = {t_statistic_beta_0}:')
-t_test(alpha, t_statistic_beta_0)
+# print(f't-test for β_0 = {t_statistic_beta_0}:')
+# t_test(alpha, t_statistic_beta_0)
 
 # perform a t-test using the annual averages for β_1
-print(f't-test for β_1 = {t_statistic_beta_1}:')
+print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:', end = ' ')
 t_test(alpha, t_statistic_beta_1)
 
 # Nonparametric residual bootstrap
 
 # obtain the sequence of simulated test statistic 
-bootstrap_t_list_iid_winter = perform_iidBootstrap(numberOfSimulations, winterAverage, matrix_X, estimate_beta)
+bootstrap_beta1_list_iid_winter, bootstrap_t_list_iid_winter = perform_iidBootstrap(numberOfSimulations, winterAverage, matrix_X, estimate_beta)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_iid_winter, t_statistic_beta_1)
 # report the bootstrap p-value
@@ -272,7 +278,7 @@ print(f'i.i.d. bootstrap: The bootstrap p-value is {bootstrap_p}.')
 # Wild bootstrap
 
 # obtain the sequence of simulated test statistic 
-bootstrap_t_list_wild_winter = perform_wildBootstrap(numberOfSimulations, winterAverage, matrix_X, estimate_beta)
+bootstrap_beta1_list_wild_winter, bootstrap_t_list_wild_winter = perform_wildBootstrap(numberOfSimulations, winterAverage, matrix_X, estimate_beta)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_wild_winter, t_statistic_beta_1)
 # report the bootstrap p-value
@@ -286,6 +292,8 @@ print('')
 print('Exercise 2a: Summer Average')
 
 matrix_X, estimate_beta, hat_y, hat_residuals = runRegressionModel(summerAverage, time_list)
+
+print(f'Summer: β_0 = {round(estimate_beta.iat[0,0],3)} & β_1 = {round(estimate_beta.iat[1,0],3)}')
 
 # compute the HAC standard errors
 estimate_SE = getHACStandardError(matrix_X, summerAverage)
@@ -302,17 +310,17 @@ t_statistic_beta_1 = estimate_beta.iat[1,0] / SE_beta_1
 alpha = 0.05
 
 # perform a t-test using the annual averages for β_0
-print(f't-test for β_0 = {t_statistic_beta_0}:')
-t_test(alpha, t_statistic_beta_0)
+# print(f't-test for β_0 = {t_statistic_beta_0}:')
+# t_test(alpha, t_statistic_beta_0)
 
 # perform a t-test using the annual averages for β_1
-print(f't-test for β_1 = {t_statistic_beta_1}:')
+print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:', end = ' ')
 t_test(alpha, t_statistic_beta_1)
 
 # Nonparametric residual bootstrap
 
 # obtain the sequence of simulated test statistic 
-bootstrap_t_list_iid_summer = perform_iidBootstrap(numberOfSimulations, summerAverage, matrix_X, estimate_beta)
+bootstrap_beta1_list_iid_summer, bootstrap_t_list_iid_summer = perform_iidBootstrap(numberOfSimulations, summerAverage, matrix_X, estimate_beta)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_iid_summer, t_statistic_beta_1)
 # report the bootstrap p-value
@@ -321,7 +329,7 @@ print(f'i.i.d. bootstrap: The bootstrap p-value is {bootstrap_p}.')
 # Wild bootstrap
 
 # obtain the sequence of simulated test statistic 
-bootstrap_t_list_wild_summer = perform_wildBootstrap(numberOfSimulations, summerAverage, matrix_X, estimate_beta)
+bootstrap_beta1_list_wild_summer, bootstrap_t_list_wild_summer = perform_wildBootstrap(numberOfSimulations, summerAverage, matrix_X, estimate_beta)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_wild_summer, t_statistic_beta_1)
 # report the bootstrap p-value
@@ -335,6 +343,7 @@ print('')
 '''
 Exercise 3a: construct the confidence intervals
 '''
+print('Exercise 3a: confidence intervals')
 
 # calculation for quantile values
 def getQuantile(c_1_quantile, c_2_quantile, resultList):
@@ -400,23 +409,25 @@ def getSymmetricPercentileTCI(input_alpha, input_bootstrap_list, input_theta, in
     return result_CI
 
 # Nonparametric residual bootstrap
+
+
 print('i.i.d. bootstrap:')
-etpi_iid = getEqualTailedPercentileCI(alpha, bootstrap_t_list_iid_annual, theta_n)
+etpi_iid = getEqualTailedPercentileCI(alpha, bootstrap_beta1_list_iid_annual, theta_n)
 print(f'The equal-tailed percentile interval is {etpi_iid}.')
 etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_annual, theta_n ,SE_beta_1)
 print(f'The equal-tailed percentile-t interval is {etpti_iid}.')
-spi_iid = getSymmetricPercentileCI(alpha, bootstrap_t_list_iid_annual, theta_n)
+spi_iid = getSymmetricPercentileCI(alpha, bootstrap_beta1_list_iid_annual, theta_n)
 print(f'The symmetric percentile interval is {spi_iid}.')
 spti_iid = getSymmetricPercentileTCI(alpha, bootstrap_t_list_iid_annual, theta_n ,SE_beta_1)
 print(f'The equal-tailed percentile-t interval is {etpti_iid}.')
 
 # Wild bootstrap
 print('Wild bootstrap:')
-etpi_iid = getEqualTailedPercentileCI(alpha, bootstrap_t_list_wild_annual, theta_n)
+etpi_iid = getEqualTailedPercentileCI(alpha, bootstrap_beta1_list_wild_annual, theta_n)
 print(f'The equal-tailed percentile interval is {etpi_iid}.')
 etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_annual, theta_n ,SE_beta_1)
 print(f'The equal-tailed percentile-t interval is {etpti_iid}.')
-spi_iid = getSymmetricPercentileCI(alpha, bootstrap_t_list_wild_annual, theta_n)
+spi_iid = getSymmetricPercentileCI(alpha, bootstrap_beta1_list_wild_annual, theta_n)
 print(f'The symmetric percentile interval is {spi_iid}.')
 spti_iid = getSymmetricPercentileTCI(alpha, bootstrap_t_list_wild_annual, theta_n ,SE_beta_1)
 print(f'The symmetric percentile-t interval is {spti_iid}.')
