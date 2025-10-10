@@ -125,8 +125,8 @@ theta_n = estimate_beta_original.iat[1,0]
 estimate_SE = getHACStandardError(matrix_X_original, annualAverage)
 
 # compute t-statistic for β_1 under the null 
-SE_beta_1_OLS = estimate_SE[1]
-t_statistic_beta_1 = estimate_beta_original.iat[1,0] / SE_beta_1_OLS
+SE_beta_1_original = estimate_SE[1]
+t_statistic_beta_1 = estimate_beta_original.iat[1,0] / SE_beta_1_original
 
 # significance level
 alpha = 0.05
@@ -163,7 +163,7 @@ def perform_iidBootstrap(input_numberOfSimulation, input_x, input_y, input_matri
     if boolean_underTheNull:
         input_beta.iloc[1,0] = 0
         
-    input_beta_1 = input_beta.iat[1,0]
+    hat_beta_1 = input_beta.iat[1,0]
     
     # obtain residuals under the null
     hat_y = input_matrixX @ input_beta
@@ -171,7 +171,7 @@ def perform_iidBootstrap(input_numberOfSimulation, input_x, input_y, input_matri
     
     for b in range(0,input_numberOfSimulation):
         # simulate new_residuals as random variables from the empirical distribution
-        simulate_residuals = np.random.choice(hat_residuals.squeeze(), len(hat_residuals), replace=True)
+        simulate_residuals = np.random.choice(hat_residuals, len(hat_residuals), replace=True)
         mean_hat_residuals = np.average(hat_residuals)
         new_residuals = simulate_residuals - mean_hat_residuals
 
@@ -187,10 +187,10 @@ def perform_iidBootstrap(input_numberOfSimulation, input_x, input_y, input_matri
 
         # extract the estimate β_1
         bootstrap_beta_1 = estimate_beta_star.iloc[1,0]
-        bootstrap_beta1_list.append(bootstrap_beta_1 - input_beta_1)
+        bootstrap_beta1_list.append(bootstrap_beta_1 - hat_beta_1)
         
         # compute the bootstrap t-statistic for β_1 
-        bootstrap_t_statistic_beta_1 = (bootstrap_beta_1 - input_beta_1)/ bootstrap_SE_beta_1
+        bootstrap_t_statistic_beta_1 = (bootstrap_beta_1 - hat_beta_1)/ bootstrap_SE_beta_1
         bootstrap_t_list.append(bootstrap_t_statistic_beta_1)
     
     return bootstrap_beta1_list, bootstrap_t_list
@@ -205,7 +205,7 @@ def perform_wildBootstrap(errorDistribution, input_numberOfSimulation, input_x, 
         input_beta.iloc[1,0] = 0
     
     # extract the β_1
-    input_beta_1 = input_beta.iat[1,0]
+    hat_beta_1 = input_beta.iat[1,0]
         
     # obtain residuals under the null
     hat_y = input_matrixX @ input_beta
@@ -217,7 +217,7 @@ def perform_wildBootstrap(errorDistribution, input_numberOfSimulation, input_x, 
             new_error = np.random.normal(loc=0, scale=1, size=len(hat_residuals)) # Standard normal distribution
         elif errorDistribution == 'Rademacher':
             new_error = np.random.binomial(n=1, p=0.5, size=len(hat_residuals)) # Rademacher distribution
-        new_residuals = hat_residuals * new_error
+        new_residuals = hat_residuals * (2 * new_error - 1)
 
         # calculate new_y 
         new_y = np.array(hat_y.squeeze()) + new_residuals
@@ -231,10 +231,10 @@ def perform_wildBootstrap(errorDistribution, input_numberOfSimulation, input_x, 
         
         # extract the estimate β_1
         bootstrap_beta_1 = estimate_beta_star.iloc[1,0]
-        bootstrap_beta1_list.append(bootstrap_beta_1 - input_beta_1)
+        bootstrap_beta1_list.append(bootstrap_beta_1 - hat_beta_1)
 
         # compute the bootstrap t-statistic for β_1
-        bootstrap_t_statistic_beta_1 = (bootstrap_beta_1 - input_beta_1) / bootstrap_SE_beta_1
+        bootstrap_t_statistic_beta_1 = (bootstrap_beta_1 - hat_beta_1) / bootstrap_SE_beta_1
         bootstrap_t_list.append(bootstrap_t_statistic_beta_1)
     
     return bootstrap_beta1_list, bootstrap_t_list
@@ -275,7 +275,7 @@ SE_beta_1 = estimate_SE[1]
 t_statistic_beta_1 = estimate_beta.iat[1,0] / SE_beta_1
 
 # significance level
-alpha = 0.05
+alpha = 0.1
 
 # perform a t-test using the annual averages for β_1
 print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:', end = ' ')
@@ -356,8 +356,8 @@ def getEqualTailedPercentileCI(input_alpha, input_bootstrap_list, input_theta):
     
     cStar_1, cStar_2 = getQuantile(c_1_quantile, c_2_quantile, input_bootstrap_list)
     
-    lowerBound = float(round(input_theta - cStar_2,3))
-    upperBound = float(round(input_theta - cStar_1,3))
+    lowerBound = float(input_theta - cStar_2)
+    upperBound = float(input_theta - cStar_1)
     
     result_CI = [lowerBound, upperBound]
     
@@ -370,8 +370,8 @@ def getEqualTailedPercentileTCI(input_alpha, input_bootstrap_list, input_theta, 
     
     cStar_1, cStar_2 = getQuantile(c_1_quantile, c_2_quantile, input_bootstrap_list)
     
-    lowerBound = float(round(input_theta - cStar_2 * input_theta_SE,3))
-    upperBound = float(round(input_theta - cStar_1 * input_theta_SE,3))
+    lowerBound = float(input_theta - cStar_2 * input_theta_SE)
+    upperBound = float(input_theta - cStar_1 * input_theta_SE)
     
     result_CI = [lowerBound, upperBound]
     
@@ -384,8 +384,8 @@ def getSymmetricPercentileCI(input_alpha, input_bootstrap_list, input_theta):
     
     cStar_1, cStar_2 = getQuantile(c_1_quantile, c_2_quantile, input_bootstrap_list)
     
-    lowerBound = float(round(input_theta - cStar_2,3))
-    upperBound = float(round(input_theta + cStar_2,3))
+    lowerBound = float(input_theta - cStar_2)
+    upperBound = float(input_theta + cStar_2)
     
     result_CI = [lowerBound, upperBound]
     
@@ -398,8 +398,8 @@ def getSymmetricPercentileTCI(input_alpha, input_bootstrap_list, input_theta, in
     
     cStar_1, cStar_2 = getQuantile(c_1_quantile, c_2_quantile, input_bootstrap_list)
     
-    lowerBound = float(round(input_theta - cStar_2 * input_theta_SE,3))
-    upperBound = float(round(input_theta + cStar_2 * input_theta_SE,3))
+    lowerBound = float(input_theta - cStar_2 * input_theta_SE)
+    upperBound = float(input_theta + cStar_2 * input_theta_SE)
     
     result_CI = [lowerBound, upperBound]
     
@@ -414,24 +414,24 @@ bootstrap_beta1_list_wild_annual, bootstrap_t_list_wild_annual = perform_wildBoo
 # Nonparametric residual bootstrap
 print('i.i.d. bootstrap:')
 etpi_iid = getEqualTailedPercentileCI(alpha, bootstrap_beta1_list_iid_annual, theta_n)
-print(f'The equal-tailed percentile interval is {etpi_iid}.')
-etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_annual, theta_n ,SE_beta_1_OLS)
-print(f'The equal-tailed percentile-t interval is {etpti_iid}.')
-spi_iid = getSymmetricPercentileCI(alpha, list(map(abs, bootstrap_beta1_list_iid_annual)), theta_n)
-print(f'The symmetric percentile interval is {spi_iid}.')
-spti_iid = getSymmetricPercentileTCI(alpha, list(map(abs, bootstrap_t_list_iid_annual)), theta_n ,SE_beta_1_OLS)
-print(f'The equal-tailed percentile-t interval is {etpti_iid}.')
+print(f'The equal-tailed percentile interval is {np.round(etpi_iid,3)}.')
+etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_annual, theta_n ,SE_beta_1_original)
+print(f'The equal-tailed percentile-t interval is {np.round(etpti_iid,3)}.')
+spi_iid = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_iid_annual), theta_n)
+print(f'The symmetric percentile interval is {np.round(spi_iid,3)}.')
+spti_iid = getSymmetricPercentileTCI(alpha, np.abs(bootstrap_t_list_iid_annual), theta_n ,SE_beta_1_original)
+print(f'The symmetric percentile-t interval is {np.round(etpti_iid,3)}.')
 
 # Wild bootstrap
 print('Wild bootstrap:')
 etpi_wild = getEqualTailedPercentileCI(alpha, bootstrap_beta1_list_wild_annual, theta_n)
-print(f'The equal-tailed percentile interval is {etpi_wild}.')
-etpti_wild = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_annual, theta_n ,SE_beta_1_OLS)
-print(f'The equal-tailed percentile-t interval is {etpti_wild}.')
-spi_wild = getSymmetricPercentileCI(alpha, list(map(abs, bootstrap_beta1_list_wild_annual)), theta_n)
-print(f'The symmetric percentile interval is {spi_wild}.')
-spti_wild = getSymmetricPercentileTCI(alpha, list(map(abs, bootstrap_t_list_wild_annual)), theta_n ,SE_beta_1_OLS)
-print(f'The symmetric percentile-t interval is {spti_wild}.')
+print(f'The equal-tailed percentile interval is {np.round(etpi_wild,3)}.')
+etpti_wild = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_annual, theta_n ,SE_beta_1_original)
+print(f'The equal-tailed percentile-t interval is {np.round(etpti_wild,3)}.')
+spi_wild = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_wild_annual), theta_n)
+print(f'The symmetric percentile interval is {np.round(spi_wild,3)}.')
+spti_wild = getSymmetricPercentileTCI(alpha, np.abs(bootstrap_t_list_wild_annual), theta_n ,SE_beta_1_original)
+print(f'The symmetric percentile-t interval is {np.round(spti_wild,3)}.')
 
 # Block bootstrap
 
@@ -478,7 +478,7 @@ for i in range(0, capitalN):
     # generate specific error terms which are depending on time
     for t in range(1, n+1):
         this_errorTerms = np.random.normal(loc=0, scale=np.sqrt(t), size=1)
-        errorTerms_list.append(this_errorTerms[0])
+        errorTerms_list.append(float(this_errorTerms[0]))
         
     generatedYList = []
 
@@ -502,21 +502,20 @@ for i in range(0, capitalN):
     
     # obtain the sequence of simulated test statistic using Nonparametric residual bootstrap
     bootstrap_beta1_list_iid_newY, bootstrap_t_list_iid_newY = perform_iidBootstrap(numberOfSimulations, new_time_list, generatedYList, matrix_X, estimate_beta, False)
-    
+
     # obtain the Equal-Tailed Percentile-t and Symmetric Percentile bootstrap confidence interval
     etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_newY, theta_n_newY , this_SE_beta_1)
     iid_etpt_ci_list.append(etpti_iid)
-    spi_iid = getSymmetricPercentileCI(alpha, list(map(abs, bootstrap_beta1_list_iid_newY)), theta_n_newY)
+    spi_iid = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_iid_newY), theta_n_newY)
     iid_sp_ci_list.append(spi_iid)
     # print(f'iid: {etpti_iid}', end=', ')
     
     # obtain the sequence of simulated test statistic using Wild bootstrap
     bootstrap_beta1_list_wild_newY, bootstrap_t_list_wild_newY = perform_wildBootstrap('Standard Normal', numberOfSimulations, new_time_list, generatedYList, matrix_X, estimate_beta, False)
-    
     # obtain the Equal-Tailed Percentile-t and Symmetric Percentile bootstrap confidence interval
     etpti_wild = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_newY, theta_n_newY ,this_SE_beta_1)
     wild_etpt_ci_list.append(etpti_wild)
-    spi_wild = getSymmetricPercentileCI(alpha, list(map(abs, bootstrap_beta1_list_wild_newY)), theta_n_newY)
+    spi_wild = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_wild_newY), theta_n_newY)
     wild_sp_ci_list.append(spi_wild)
     # print(f'Wild: {etpti_wild}')
 
