@@ -280,6 +280,50 @@ print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.')
 # Block bootstrap
 
 # Sieve bootstrap
+def perform_sieveBootstrap(input_numberOfSimulation, input_x, input_y, input_matrixX, input_beta, p = 5, boolean_underTheNull=False):
+
+    bootstrap_beta1_list = []
+    bootstrap_t_list = []
+
+    if boolean_underTheNull:
+        input_beta.iloc[1, 0] = 0
+    
+    input_beta_1 = input_beta.iat[1, 0]
+
+    hat_y = input_matrixX @ input_beta
+    hat_residuals = np.array(input_y) - np.array(hat_y.squeeze())
+
+    Y = hat_residuals[p:]
+    X = np.column_stack([hat_residuals[p - i - 1: -i - 1 or None] for i in range(p)])
+    X = np.column_stack([np.ones(len(Y)), X])
+    phi_hat = np.linalg.inv(X.T @ X) @ X.T @ Y
+    u_hat = Y - X @ phi_hat
+
+    n = len(hat_residuals)
+
+    for b in range(input_numberOfSimulation):
+        u_star = np.random.choice(u_hat, size = n, replace = True)
+        eps_star = np.zeros(n)
+
+        for t in range(p, n):
+            eps_star[t] = phi_hat[0] + np.dot(phi_hat[1:], eps_star[t - p:t][::-1]) + u_star[t]
+
+        new_y = np.array(hat_y.squeeze()) + eps_star
+
+        matrix_X_star, estimate_beta_star, hat_y_star, hat_residuals_star = runRegressionModel(new_y, input_x)
+
+        bootstrap_estimate_SE = getHCStandardError(matrix_X_star, hat_residuals_star.squeeze())
+        bootstrap_SE_beta_1 = bootstrap_estimate_SE[1]
+
+        bootstrap_beta_1 = estimate_beta_star.iloc[1, 0]
+        bootstrap_beta1_list.append(bootstrap_beta_1 - input_beta_1)
+        bootstrap_t_statistic_beta_1 = (bootstrap_beta_1 - input_beta_1) / bootstrap_SE_beta_1
+        bootstrap_t_list.append(bootstrap_t_statistic_beta_1)
+
+bootstrap_beta1_list_sieve_annual, bootstrap_t_list_sieve_annual = perform_sieveBootstrap(
+    numberOfSimulations, time_list, annualAverage, matrix_X_original, estimate_beta_original, p=5, boolean_underTheNull = True)
+bootstrap_p = computeBootstrapPValue(bootstrap_t_list_sieve_annual, t_statistic_beta_1)
+print(f'Sieve bootstrap: The bootstrap p-value is {bootstrap_p}.')
 
 '''
 Exercise 2a: perform the t-test using the winter and summer averages
@@ -325,6 +369,11 @@ print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.')
 # Block bootstrap
 
 # Sieve bootstrap
+bootstrap_beta1_list_sieve_winter, bootstrap_t_list_sieve_winter = perform_sieveBootstrap(
+    numberOfSimulations, time_list, winterAverage, matrix_X, estimate_beta, p=5, boolean_underTheNull = True)
+bootstrap_p = computeBootstrapPValue(bootstrap_t_list_sieve_winter, t_statistic_beta_1)
+print(f'Sieve bootstrap: The bootstrap p-value is {bootstrap_p}.')
+
 
 print('\nExercise 2a: Summer Average')
 
@@ -367,6 +416,11 @@ print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.')
 # Block bootstrap
 
 # Sieve bootstrap
+bootstrap_beta1_list_sieve_summer, bootstrap_t_list_sieve_summer = perform_sieveBootstrap(
+    numberOfSimulations, time_list, summerAverage, matrix_X, estimate_beta, p=5, boolean_underTheNull = True)
+bootstrap_p = computeBootstrapPValue(bootstrap_t_list_sieve_summer, t_statistic_beta_1)
+print(f'Sieve bootstrap: The bootstrap p-value is {bootstrap_p}.')
+
 
 '''
 Exercise 3a: construct the confidence intervals
@@ -474,6 +528,19 @@ print(f'The symmetric percentile-t interval is {np.round(spti_wild,3)}.')
 # Block bootstrap
 
 # Sieve bootstrap
+bootstrap_beta1_list_sieve_annual, bootstrap_t_list_sieve_annual = perform_sieveBootstrap(
+    numberOfSimulations, time_list, annualAverage, matrix_X_original, estimate_beta_original, p=5, boolean_underTheNull=False
+)
+print('Sieve bootstrap:')
+etpi_sieve = getEqualTailedPercentileCI(alpha, bootstrap_beta1_list_sieve_annual, theta_n)
+print(f'The equal-tailed percentile interval is {etpi_sieve}.')
+etpti_sieve = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_sieve_annual, theta_n ,SE_beta_1_OLS)
+print(f'The equal-tailed percentile-t interval is {etpti_sieve}.')
+spi_sieve = getSymmetricPercentileCI(alpha, list(map(abs, bootstrap_beta1_list_sieve_annual)), theta_n)
+print(f'The symmetric percentile interval is {spi_sieve}.')
+spti_sieve = getSymmetricPercentileTCI(alpha, list(map(abs, bootstrap_t_list_sieve_annual)), theta_n ,SE_beta_1_OLS)
+print(f'The symmetric percentile-t interval is {spti_sieve}.')
+
 
 '''
 Exercise 4: the empirical coverages
