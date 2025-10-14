@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+import matplotlib.pyplot as plt
 import statsmodels.api as sm
+from scipy.stats import norm
+import time
+
+start_time = time.time()   # record start time
 
 def read_csv(filename, hasHeader) -> str:
     output = pd.read_csv(filename, header = hasHeader)
@@ -62,7 +66,7 @@ def getStandardError(input_matrix, input_residuals):
                         columns=df.index) 
 
     # compute the variance-covariance matrix
-    varCovMatrix = estimated_variance * df_inv
+    varCovMatrix = estimated_variance.iat[0,0] * df_inv
 
     # get the standard errors which are the diagonal element
     estimated_standard_error = np.sqrt(np.diag(varCovMatrix))
@@ -90,13 +94,20 @@ def getHCStandardError(input_matrix, input_residuals):
 # calculation for HAC standard errors
 def getHACStandardError(input_matrix, input_y):
     n = len(input_y)
+    # set the maximum lags
     maxlags = int(np.floor(4 * (n/100)**(2/9)))
     
+    # estimate the model and get the HAC residuals
     res_hac = sm.OLS(input_y, input_matrix).fit(cov_type='HAC', 
                                                 cov_kwds={'maxlags': maxlags, 'use_correction': True})
+    
+    # compute the HAC variance-covariance matrix
     V_hat_HAC = res_hac.cov_params()  
-    SEs = np.sqrt(np.diag(V_hat_HAC))
-    return SEs
+    
+    # get the standard errors which are the diagonal element
+    estimated_standard_error = np.sqrt(np.diag(V_hat_HAC))
+    
+    return estimated_standard_error
 
 # perform t-test using standard normal critical values
 def t_test(input_alpha, input_t):
@@ -109,37 +120,38 @@ def t_test(input_alpha, input_t):
         print(f't ∉ [{t_crit_lower},{t_crit_upper}]: Reject the null.')
         
 '''
-Exercise 1a
+Exercise 1a: t-test based on real data
 '''
-
 print('Exercise 1a: t-test based on real data')
 
+# define the list of t
 time_list = np.linspace(1, len(annualAverage), len(annualAverage))
 
 # estimate the model using OLS regression
 matrix_X_original, estimate_beta_original, hat_y, hat_residuals = runRegressionModel(annualAverage, time_list)
+# report the estimated coefficients
+print(f'Annual: β_0 = {round(estimate_beta_original.iat[0,0],3)} & β_1 = {round(estimate_beta_original.iat[1,0],3)}')
 
+# extract the estimated beta from actual data
 theta_n = estimate_beta_original.iat[1,0]
 
-# compute the HAC standard errors
-estimate_SE = getHACStandardError(matrix_X_original, annualAverage)
+# compute the standard errors
+estimate_HACSE_original = getHACStandardError(matrix_X_original, annualAverage)[1]
+estimate_SE_original = getStandardError(matrix_X_original, hat_residuals)[1]
+estimate_HCSE_original = getHCStandardError(matrix_X_original, hat_residuals.squeeze())[1]
 
-# compute t-statistic for β_1 under the null 
-SE_beta_1_original = estimate_SE[1]
-t_statistic_beta_1 = estimate_beta_original.iat[1,0] / SE_beta_1_original
-
-# significance level
-alpha = 0.05
+# compute t-statistic for β_1 under the null
+t_statistic_beta_1 = estimate_beta_original.iat[1,0] / estimate_HACSE_original
 
 # perform a t-test using the annual averages for β_1
+alpha = 0.1 # significance level
 print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:', end = ' ')
 t_test(alpha, t_statistic_beta_1)
 
-print('')
 '''
 Exercise 1b: perform the t-test using the different bootstrap methods
 '''
-print('Exercise 1b: t-test using different bootstrap methods')
+print('\nExercise 1b: t-test using different bootstrap methods')
 
 numberOfSimulations = 999
 
@@ -160,13 +172,17 @@ def perform_iidBootstrap(input_numberOfSimulation, input_x, input_y, input_matri
     bootstrap_beta1_list = []
     bootstrap_t_list = []
     
+    this_beta = input_beta.copy()
+    
+    # restricted β_1 = 0 if performing bootstrap under the null
     if boolean_underTheNull:
-        input_beta.iloc[1,0] = 0
-        
-    hat_beta_1 = input_beta.iat[1,0]
+        this_beta.iloc[1,0] = 0
+    
+    # extract the β_1
+    hat_beta_1 = this_beta.iat[1,0]
     
     # obtain residuals under the null
-    hat_y = input_matrixX @ input_beta
+    hat_y = input_matrixX @ this_beta
     hat_residuals = np.array(input_y) - np.array(hat_y.squeeze())
     
     for b in range(0,input_numberOfSimulation):
@@ -182,16 +198,16 @@ def perform_iidBootstrap(input_numberOfSimulation, input_x, input_y, input_matri
         matrix_X_star, estimate_beta_star, hat_y_star, hat_residuals_star = runRegressionModel(new_y, input_x)
 
         # compute the standard error of β_1
-        bootstrap_estimate_SE = getStandardError(matrix_X_star, new_y)
+        bootstrap_estimate_SE = getStandardError(matrix_X_star, hat_residuals_star)
         bootstrap_SE_beta_1 = bootstrap_estimate_SE[1]
 
-        # extract the estimate β_1
+        # extract the bootstrap estimate β_1
         bootstrap_beta_1 = estimate_beta_star.iloc[1,0]
-        bootstrap_beta1_list.append(bootstrap_beta_1 - hat_beta_1)
+        bootstrap_beta1_list.append(float(bootstrap_beta_1 - hat_beta_1))
         
         # compute the bootstrap t-statistic for β_1 
         bootstrap_t_statistic_beta_1 = (bootstrap_beta_1 - hat_beta_1)/ bootstrap_SE_beta_1
-        bootstrap_t_list.append(bootstrap_t_statistic_beta_1)
+        bootstrap_t_list.append(float(bootstrap_t_statistic_beta_1))
     
     return bootstrap_beta1_list, bootstrap_t_list
 
@@ -200,24 +216,27 @@ def perform_wildBootstrap(errorDistribution, input_numberOfSimulation, input_x, 
     bootstrap_beta1_list = []
     bootstrap_t_list = []
     
-    # set β_1 = 0 if performing bootstrap under the null
+    this_beta = input_beta.copy()
+    
+    # restricted β_1 = 0 if performing bootstrap under the null
     if boolean_underTheNull:
-        input_beta.iloc[1,0] = 0
+        this_beta.iloc[1,0] = 0
     
     # extract the β_1
-    hat_beta_1 = input_beta.iat[1,0]
+    hat_beta_1 = this_beta.iat[1,0]
         
     # obtain residuals under the null
-    hat_y = input_matrixX @ input_beta
+    hat_y = input_matrixX @ this_beta
     hat_residuals = np.array(input_y) - np.array(hat_y.squeeze())
     
     for b in range(0,input_numberOfSimulation):
         # simulate new_residuals bootstrap errors
         if errorDistribution == 'Standard Normal':
             new_error = np.random.normal(loc=0, scale=1, size=len(hat_residuals)) # Standard normal distribution
+            new_residuals = hat_residuals * new_error
         elif errorDistribution == 'Rademacher':
             new_error = np.random.binomial(n=1, p=0.5, size=len(hat_residuals)) # Rademacher distribution
-        new_residuals = hat_residuals * (2 * new_error - 1)
+            new_residuals = hat_residuals * (2 * new_error - 1)
 
         # calculate new_y 
         new_y = np.array(hat_y.squeeze()) + new_residuals
@@ -229,7 +248,7 @@ def perform_wildBootstrap(errorDistribution, input_numberOfSimulation, input_x, 
         bootstrap_estimate_SE = getHCStandardError(matrix_X_star, hat_residuals_star.squeeze())
         bootstrap_SE_beta_1 = bootstrap_estimate_SE[1]
         
-        # extract the estimate β_1
+        # extract the bootstrap estimate β_1
         bootstrap_beta_1 = estimate_beta_star.iloc[1,0]
         bootstrap_beta1_list.append(bootstrap_beta_1 - hat_beta_1)
 
@@ -240,13 +259,20 @@ def perform_wildBootstrap(errorDistribution, input_numberOfSimulation, input_x, 
     return bootstrap_beta1_list, bootstrap_t_list
 
 # obtain the sequence of simulated test statistic using Nonparametric residual bootstrap
-bootstrap_beta1_list_iid_annual, bootstrap_t_list_iid_annual = perform_iidBootstrap(numberOfSimulations, time_list, annualAverage, matrix_X_original, estimate_beta_original, True)
+bootstrap_beta1_list_iid_annual, bootstrap_t_list_iid_annual = perform_iidBootstrap(input_numberOfSimulation=numberOfSimulations, 
+                                                                                    input_x=time_list, input_y=annualAverage, 
+                                                                                    input_matrixX=matrix_X_original, input_beta=estimate_beta_original, 
+                                                                                    boolean_underTheNull=True)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_iid_annual, t_statistic_beta_1)
 print(f'i.i.d. bootstrap: The bootstrap p-value is {bootstrap_p}.') 
 
 # obtain the sequence of simulated test statistic using Wild bootstrap
-bootstrap_beta1_list_wild_annual, bootstrap_t_list_wild_annual = perform_wildBootstrap('Standard Normal', numberOfSimulations, time_list, annualAverage, matrix_X_original, estimate_beta_original, True)
+bootstrap_beta1_list_wild_annual, bootstrap_t_list_wild_annual = perform_wildBootstrap(errorDistribution='Standard Normal', 
+                                                                                       input_numberOfSimulation=numberOfSimulations, 
+                                                                                       input_x=time_list, input_y=annualAverage,
+                                                                                       input_matrixX=matrix_X_original, input_beta=estimate_beta_original, 
+                                                                                       boolean_underTheNull=True)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_wild_annual, t_statistic_beta_1)
 print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.') 
@@ -255,15 +281,13 @@ print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.')
 
 # Sieve bootstrap
 
-print('')
 '''
 Exercise 2a: perform the t-test using the winter and summer averages
 '''
-print('Exercise 2a: Winter Average')
+print('\nExercise 2a: Winter Average')
 
 # estimate the model using OLS regression
 matrix_X, estimate_beta, hat_y, hat_residuals = runRegressionModel(winterAverage, time_list)
-
 # report the estimated coefficients
 print(f'Winter: β_0 = {round(estimate_beta.iat[0,0],3)} & β_1 = {round(estimate_beta.iat[1,0],3)}')
 
@@ -274,21 +298,26 @@ estimate_SE = getHACStandardError(matrix_X, winterAverage)
 SE_beta_1 = estimate_SE[1]
 t_statistic_beta_1 = estimate_beta.iat[1,0] / SE_beta_1
 
-# significance level
-alpha = 0.1
-
-# perform a t-test using the annual averages for β_1
+# perform a t-test using the winter averages for β_1
+alpha = 0.1 # significance level
 print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:', end = ' ')
 t_test(alpha, t_statistic_beta_1)
 
 # obtain the sequence of simulated test statistic using Nonparametric residual bootstrap
-bootstrap_beta1_list_iid_winter, bootstrap_t_list_iid_winter = perform_iidBootstrap(numberOfSimulations, time_list, winterAverage, matrix_X, estimate_beta, True)
+bootstrap_beta1_list_iid_winter, bootstrap_t_list_iid_winter = perform_iidBootstrap(input_numberOfSimulation=numberOfSimulations, 
+                                                                                    input_x=time_list, input_y=winterAverage, 
+                                                                                    input_matrixX=matrix_X, input_beta=estimate_beta, 
+                                                                                    boolean_underTheNull=True)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_iid_winter, t_statistic_beta_1)
 print(f'i.i.d. bootstrap: The bootstrap p-value is {bootstrap_p}.') 
 
 # obtain the sequence of simulated test statistic using Wild bootstrap
-bootstrap_beta1_list_wild_winter, bootstrap_t_list_wild_winter = perform_wildBootstrap('Standard Normal', numberOfSimulations, time_list, winterAverage, matrix_X, estimate_beta, True)
+bootstrap_beta1_list_wild_winter, bootstrap_t_list_wild_winter = perform_wildBootstrap(errorDistribution='Standard Normal', 
+                                                                                       input_numberOfSimulation=numberOfSimulations, 
+                                                                                       input_x=time_list, input_y=winterAverage, 
+                                                                                       input_matrixX=matrix_X, input_beta=estimate_beta, 
+                                                                                       boolean_underTheNull=True)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_wild_winter, t_statistic_beta_1)
 print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.') 
@@ -297,12 +326,10 @@ print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.')
 
 # Sieve bootstrap
 
-print('')
-print('Exercise 2a: Summer Average')
+print('\nExercise 2a: Summer Average')
 
 # estimate the model using OLS regression
 matrix_X, estimate_beta, hat_y, hat_residuals = runRegressionModel(summerAverage, time_list)
-
 # report the estimated coefficients
 print(f'Summer: β_0 = {round(estimate_beta.iat[0,0],3)} & β_1 = {round(estimate_beta.iat[1,0],3)}')
 
@@ -313,21 +340,26 @@ estimate_SE = getHACStandardError(matrix_X, summerAverage)
 SE_beta_1 = estimate_SE[1]
 t_statistic_beta_1 = estimate_beta.iat[1,0] / SE_beta_1
 
-# significance level
-alpha = 0.05
-
-# perform a t-test using the annual averages for β_1
+# perform a t-test using the summer averages for β_1
+alpha = 0.1 # significance level
 print(f't-test for β_1 = {round(t_statistic_beta_1,3)}:', end = ' ')
 t_test(alpha, t_statistic_beta_1)
 
 # obtain the sequence of simulated test statistic using Nonparametric residual bootstrap
-bootstrap_beta1_list_iid_summer, bootstrap_t_list_iid_summer = perform_iidBootstrap(numberOfSimulations, time_list, summerAverage, matrix_X, estimate_beta, True)
+bootstrap_beta1_list_iid_summer, bootstrap_t_list_iid_summer = perform_iidBootstrap(input_numberOfSimulation=numberOfSimulations, 
+                                                                                    input_x=time_list, input_y=summerAverage, 
+                                                                                    input_matrixX=matrix_X, input_beta=estimate_beta, 
+                                                                                    boolean_underTheNull=True)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_iid_summer, t_statistic_beta_1)
 print(f'i.i.d. bootstrap: The bootstrap p-value is {bootstrap_p}.') 
 
 # obtain the sequence of simulated test statistic using Wild bootstrap
-bootstrap_beta1_list_wild_summer, bootstrap_t_list_wild_summer = perform_wildBootstrap('Standard Normal', numberOfSimulations, time_list, summerAverage, matrix_X, estimate_beta, True)
+bootstrap_beta1_list_wild_summer, bootstrap_t_list_wild_summer = perform_wildBootstrap(errorDistribution='Standard Normal', 
+                                                                                       input_numberOfSimulation=numberOfSimulations, 
+                                                                                       input_x=time_list, input_y=summerAverage, 
+                                                                                       input_matrixX=matrix_X, input_beta=estimate_beta, 
+                                                                                       boolean_underTheNull=True)
 # compute the bootstrap p-value       
 bootstrap_p = computeBootstrapPValue(bootstrap_t_list_wild_summer, t_statistic_beta_1)
 print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.') 
@@ -336,11 +368,10 @@ print(f'Wild bootstrap: The bootstrap p-value is {bootstrap_p}.')
 
 # Sieve bootstrap
 
-print('')
 '''
 Exercise 3a: construct the confidence intervals
 '''
-print('Exercise 3a: confidence intervals')
+print('\nExercise 3a: confidence intervals')
 
 # calculation for quantile values
 def getQuantile(c_1_quantile, c_2_quantile, resultList):
@@ -406,42 +437,48 @@ def getSymmetricPercentileTCI(input_alpha, input_bootstrap_list, input_theta, in
     return result_CI
 
 # obtain the sequence of simulated test statistic using iid Bootstrap (not under the null)
-bootstrap_beta1_list_iid_annual, bootstrap_t_list_iid_annual = perform_iidBootstrap(numberOfSimulations, time_list, annualAverage, matrix_X_original, estimate_beta_original, False)
+bootstrap_beta1_list_iid_annual, bootstrap_t_list_iid_annual = perform_iidBootstrap(input_numberOfSimulation=numberOfSimulations, 
+                                                                                    input_x=time_list, input_y=annualAverage, 
+                                                                                    input_matrixX=matrix_X_original, input_beta=estimate_beta_original, 
+                                                                                    boolean_underTheNull=False)
 
 # obtain the sequence of simulated test statistic using Wild Bootstrap (not under the null)
-bootstrap_beta1_list_wild_annual, bootstrap_t_list_wild_annual = perform_wildBootstrap('Standard Normal', numberOfSimulations, time_list, annualAverage, matrix_X_original, estimate_beta_original, False)
+bootstrap_beta1_list_wild_annual, bootstrap_t_list_wild_annual = perform_wildBootstrap(errorDistribution='Standard Normal', 
+                                                                                       input_numberOfSimulation=numberOfSimulations, 
+                                                                                       input_x=time_list, input_y=annualAverage, 
+                                                                                       input_matrixX=matrix_X_original, input_beta=estimate_beta_original, 
+                                                                                       boolean_underTheNull=False)
 
 # Nonparametric residual bootstrap
 print('i.i.d. bootstrap:')
 etpi_iid = getEqualTailedPercentileCI(alpha, bootstrap_beta1_list_iid_annual, theta_n)
 print(f'The equal-tailed percentile interval is {np.round(etpi_iid,3)}.')
-etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_annual, theta_n ,SE_beta_1_original)
+etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_annual, theta_n, estimate_SE_original)
 print(f'The equal-tailed percentile-t interval is {np.round(etpti_iid,3)}.')
 spi_iid = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_iid_annual), theta_n)
 print(f'The symmetric percentile interval is {np.round(spi_iid,3)}.')
-spti_iid = getSymmetricPercentileTCI(alpha, np.abs(bootstrap_t_list_iid_annual), theta_n ,SE_beta_1_original)
+spti_iid = getSymmetricPercentileTCI(alpha, np.abs(bootstrap_t_list_iid_annual), theta_n, estimate_SE_original)
 print(f'The symmetric percentile-t interval is {np.round(etpti_iid,3)}.')
 
 # Wild bootstrap
 print('Wild bootstrap:')
 etpi_wild = getEqualTailedPercentileCI(alpha, bootstrap_beta1_list_wild_annual, theta_n)
 print(f'The equal-tailed percentile interval is {np.round(etpi_wild,3)}.')
-etpti_wild = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_annual, theta_n ,SE_beta_1_original)
+etpti_wild = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_annual, theta_n, estimate_HCSE_original)
 print(f'The equal-tailed percentile-t interval is {np.round(etpti_wild,3)}.')
 spi_wild = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_wild_annual), theta_n)
 print(f'The symmetric percentile interval is {np.round(spi_wild,3)}.')
-spti_wild = getSymmetricPercentileTCI(alpha, np.abs(bootstrap_t_list_wild_annual), theta_n ,SE_beta_1_original)
+spti_wild = getSymmetricPercentileTCI(alpha, np.abs(bootstrap_t_list_wild_annual), theta_n, estimate_HCSE_original)
 print(f'The symmetric percentile-t interval is {np.round(spti_wild,3)}.')
 
 # Block bootstrap
 
 # Sieve bootstrap
 
-print('')
 '''
 Exercise 4: the empirical coverages
 '''
-print('Exercise 4: the empirical coverages')
+print('\nExercise 4: the empirical coverages')
 
 # calculation for the empirical coverage
 def checkCoverage(input_ci_list, input_trueBeta):
@@ -462,8 +499,9 @@ def checkCoverage(input_ci_list, input_trueBeta):
 beta_0 = 1
 true_beta_1 = 0.5
 n = 500         # length of the time series
-capitalN = 50   # number of simulation for Monte Carlo
+capitalN = 500   # number of simulation for Monte Carlo
 
+# define new list of t
 new_time_list = np.linspace(1, n, n)
 
 iid_etpt_ci_list = []
@@ -474,13 +512,14 @@ wild_sp_ci_list = []
 # obtain confidence intervals from each bootstrap
 for i in range(0, capitalN):
     errorTerms_list = []
-        
-    # generate specific error terms which are depending on time
-    for t in range(1, n+1):
-        this_errorTerms = np.random.normal(loc=0, scale=np.sqrt(t), size=1)
-        errorTerms_list.append(float(this_errorTerms[0]))
-        
     generatedYList = []
+        
+    # generate specific error terms σ_t which are depending on time
+    for t in range(1, n+1):
+        sigma_t = np.sqrt(1 + 2 * t + 4 * t ** 2)
+        errorTerms_list.append(float(sigma_t))
+    # generate bootstrap errors as ε_t = v_t * σ_t with v_t ∼ N(0,1)
+    errorTerms_list = errorTerms_list * np.random.normal(loc=0, scale=1, size=len(errorTerms_list))
 
     # generate data from model with specific error terms
     for t in range(1, n+1):
@@ -490,34 +529,35 @@ for i in range(0, capitalN):
     # estimate the model using OLS regression
     matrix_X, estimate_beta, hat_y, hat_residuals = runRegressionModel(generatedYList, new_time_list)
 
+    # extract the estimated beta from actual data
     theta_n_newY = estimate_beta.iat[1,0]
     
-    # compute the HAC standard errors
-    estimate_SE = getHACStandardError(matrix_X, generatedYList)
-
-    # compute standard error for β_1 
-    this_SE_beta_1 = estimate_SE[1]
-    
-    # print(f'{i}: ',end='')
+    # compute the standard errors for β_1
+    estimate_SE_iid = getStandardError(matrix_X, hat_residuals)[1]
+    estimate_SE_wild = getHCStandardError(matrix_X, hat_residuals.squeeze())[1]
     
     # obtain the sequence of simulated test statistic using Nonparametric residual bootstrap
-    bootstrap_beta1_list_iid_newY, bootstrap_t_list_iid_newY = perform_iidBootstrap(numberOfSimulations, new_time_list, generatedYList, matrix_X, estimate_beta, False)
-
+    bootstrap_beta1_list_iid_newY, bootstrap_t_list_iid_newY = perform_iidBootstrap(input_numberOfSimulation=numberOfSimulations, 
+                                                                                    input_x=new_time_list, input_y=generatedYList, 
+                                                                                    input_matrixX=matrix_X, input_beta=estimate_beta, 
+                                                                                    boolean_underTheNull=False)
     # obtain the Equal-Tailed Percentile-t and Symmetric Percentile bootstrap confidence interval
-    etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_newY, theta_n_newY , this_SE_beta_1)
+    etpti_iid = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_iid_newY, theta_n_newY, estimate_SE_iid)
     iid_etpt_ci_list.append(etpti_iid)
     spi_iid = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_iid_newY), theta_n_newY)
     iid_sp_ci_list.append(spi_iid)
-    # print(f'iid: {etpti_iid}', end=', ')
     
     # obtain the sequence of simulated test statistic using Wild bootstrap
-    bootstrap_beta1_list_wild_newY, bootstrap_t_list_wild_newY = perform_wildBootstrap('Standard Normal', numberOfSimulations, new_time_list, generatedYList, matrix_X, estimate_beta, False)
+    bootstrap_beta1_list_wild_newY, bootstrap_t_list_wild_newY = perform_wildBootstrap(errorDistribution='Standard Normal', 
+                                                                                       input_numberOfSimulation=numberOfSimulations, 
+                                                                                       input_x=new_time_list, input_y=generatedYList, 
+                                                                                       input_matrixX=matrix_X, input_beta=estimate_beta, 
+                                                                                       boolean_underTheNull=False)
     # obtain the Equal-Tailed Percentile-t and Symmetric Percentile bootstrap confidence interval
-    etpti_wild = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_newY, theta_n_newY ,this_SE_beta_1)
+    etpti_wild = getEqualTailedPercentileTCI(alpha, bootstrap_t_list_wild_newY, theta_n_newY, estimate_SE_wild)
     wild_etpt_ci_list.append(etpti_wild)
     spi_wild = getSymmetricPercentileCI(alpha, np.abs(bootstrap_beta1_list_wild_newY), theta_n_newY)
     wild_sp_ci_list.append(spi_wild)
-    # print(f'Wild: {etpti_wild}')
 
 # compute the empirical coverage of Equal-Tailed Percentile-t Interval using iid and Wild Bootstrap 
 iid_etpt_Coverage = checkCoverage(iid_etpt_ci_list, true_beta_1)
@@ -530,3 +570,8 @@ iid_sp_Coverage = checkCoverage(iid_sp_ci_list, true_beta_1)
 wild_sp_Coverage = checkCoverage(wild_sp_ci_list, true_beta_1)
 print(f'The empirical coverage of the symmetric percentile Interval using iid Bootstrap is {round(iid_sp_Coverage, 3)}.')
 print(f'The empirical coverage of the symmetric percentile Interval using Wild Bootstrap is {round(wild_sp_Coverage, 3)}.')
+
+# check the execution time
+end_time = time.time()     # record end time
+elapsed = end_time - start_time
+print(f'Execution time: {elapsed:.2f} seconds')
